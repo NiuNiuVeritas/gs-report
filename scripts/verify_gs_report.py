@@ -188,7 +188,7 @@ def main() -> None:
     summary_text_rows = [row for row in summary_rows if not row[0].startswith("风险提示：")]
     missing_summary: list[str] = [row for row, _ in summary_text_rows if normalized(row) not in summary_text]
     expected_summary_bullets = sum(1 for _, is_bullet in summary_rows if is_bullet)
-    actual_summary_bullets = len(re.findall(r'data-gs-summary-bullet="true"', summary_raw))
+    actual_summary_bullets = len(re.findall(r'<li\s+data-gs-summary-bullet="true"', summary_raw))
     missing_markers: list[str] = []
     checked_markers = 0
     started = False
@@ -245,7 +245,7 @@ def main() -> None:
     unresolved = re.findall(r"\{\{[^}]+\}\}", markdown)
     img_refs = re.findall(r'<img src="([^"]+)"', markdown)
     missing_images = [ref for ref in img_refs if not (args.markdown.parent / ref).exists()]
-    actual_body_bullets = len(re.findall(r'data-gs-body-bullet="true"', markdown))
+    actual_body_bullets = len(re.findall(r'<li\s+data-gs-body-bullet="true"', markdown))
     footer_checks = {
         "source_note": "注：本文选自国信证券于" in markdown,
         "analyst": "分析师：" in markdown and re.search(r"S\d{13}", markdown) is not None,

@@ -34,7 +34,7 @@ python scripts/verify_gs_report.py --docx <report.docx> --markdown <generated.md
 
 - Fully transfer Word body content from the first `国信研报正文-1.正文一级标题` paragraph to the `免责声明` boundary.
 - Do not excerpt, rewrite, summarize down, merge, or delete body paragraphs.
-- Preserve Word body bullets; body paragraphs with Word numbering/bullet properties must render with a visible `·` marker and verify with matching counts.
+- Preserve Word body bullets; body paragraphs with Word numbering/bullet properties must render as native `<li>` bullets and verify with matching counts.
 - Preserve explicit Word bold runs in正文 paragraphs as `<strong>...</strong>`.
 - Omit Word contents/catalog pages and the full disclaimer/office-address appendix.
 - Do not output a title-area author/source line; the WeChat account config handles author metadata.
@@ -43,7 +43,7 @@ python scripts/verify_gs_report.py --docx <report.docx> --markdown <generated.md
 - Treat Word paragraph style IDs `20` and `23` as known `核心观点` summary-body starts; keep converter and verifier in sync when adding more IDs.
 - Use Chinese numerals `一、二、三` for summary points.
 - Use default body line-height `1.6` with paragraph before/after spacing `0`.
-- Keep summary blocks WeChat-editor safe: all summary containers use `box-sizing:border-box;width:100%;max-width:100%`, and summary bullets are rendered as `·` marker paragraphs rather than `<ul>/<li>` lists.
+- Keep summary blocks WeChat-editor safe: all summary containers use `box-sizing:border-box;width:100%;max-width:100%`, and summary bullets are rendered as native `<li>` bullets with controlled inline width styles.
 - Set the `总结` section's top margin to `0`.
 
 ## Figure And Table Rules

@@ -290,8 +290,8 @@ def extract_summary(document: Document) -> list[tuple[str, list[tuple[str, bool,
 
 def render_summary(groups: list[tuple[str, list[tuple[str, bool, str]]]]) -> str:
     parts = [
-        '<section style="box-sizing:border-box;width:100%;max-width:100%;margin:12px 0 22px 0;padding:18px 16px;border:1px solid #d6d6d6;border-radius:6px;background:#f7f7f7;overflow:hidden;">',
-        '<section style="text-align:center;margin:-30px 0 12px 0;"><section style="display:inline-block;background:#0f4c81;color:#ffffff;font-weight:700;font-size:15px;letter-spacing:2px;padding:8px 20px;border-radius:6px;">报告摘要</section></section>',
+        '<section style="box-sizing:border-box;width:100%;max-width:100%;margin:12px 0 22px 0;padding:0 16px 18px 16px;border:1px solid #d6d6d6;border-radius:6px;background:#f7f7f7;overflow:hidden;">',
+        '<section style="text-align:center;margin:0 0 12px 0;line-height:0;"><section style="display:inline-block;background:#0f4c81;color:#ffffff;font-weight:700;font-size:15px;letter-spacing:2px;line-height:1.6;padding:8px 20px;border-radius:0 0 6px 6px;">报告摘要</section></section>',
     ]
     for index, (heading, items) in enumerate(groups, 1):
         numeral = CN_NUMERALS[index - 1] if index <= len(CN_NUMERALS) else str(index)
@@ -299,15 +299,25 @@ def render_summary(groups: list[tuple[str, list[tuple[str, bool, str]]]]) -> str
             f'<p style="margin:0;line-height:{BODY_LINE_HEIGHT};font-size:15px;box-sizing:border-box;max-width:100%;">'
             f'<span style="color:#c00000;font-weight:700;">{numeral}、{escape(heading)}</span></p>'
         )
-        bullet_items = [item for item in items if item[1]]
-        plain_items = [item for item in items if not item[1]]
-        for _, _, item_html in plain_items:
-            parts.append(f'<p style="{SUMMARY_TEXT_STYLE}">{item_html}</p>')
-        if bullet_items:
-            for _, _, item_html in bullet_items:
+        in_list = False
+        for _, is_bullet, item_html in items:
+            if is_bullet:
+                if not in_list:
+                    parts.append(
+                        f'<ul style="margin:0;padding-left:1.2em;line-height:{BODY_LINE_HEIGHT};font-size:15px;'
+                        'color:#333333;box-sizing:border-box;max-width:100%;overflow-wrap:break-word;">'
+                    )
+                    in_list = True
                 parts.append(
-                    f'<p data-gs-summary-bullet="true" style="{SUMMARY_TEXT_STYLE}padding-left:1em;text-indent:-1em;">·&nbsp;{item_html}</p>'
+                    f'<li data-gs-summary-bullet="true" style="{SUMMARY_TEXT_STYLE}">{item_html}</li>'
                 )
+            else:
+                if in_list:
+                    parts.append("</ul>")
+                    in_list = False
+                parts.append(f'<p style="{SUMMARY_TEXT_STYLE}">{item_html}</p>')
+        if in_list:
+            parts.append("</ul>")
     parts.append("</section>")
     return "\n\n".join(parts)
 
@@ -343,8 +353,9 @@ def render_h2(number: int, title: str) -> str:
 def render_paragraph(content_html: str, is_bullet: bool = False) -> str:
     if is_bullet:
         return (
-            f'<p data-gs-body-bullet="true" style="margin:0;line-height:{BODY_LINE_HEIGHT};font-size:15px;'
-            f'color:#333333;text-align:justify;padding-left:1em;text-indent:-1em;">·&nbsp;{content_html}</p>'
+            f'<ul style="margin:0;padding-left:1.2em;line-height:{BODY_LINE_HEIGHT};font-size:15px;color:#333333;">'
+            f'<li data-gs-body-bullet="true" style="margin:0;line-height:{BODY_LINE_HEIGHT};font-size:15px;'
+            f'color:#333333;text-align:justify;">{content_html}</li></ul>'
         )
     return f'<p style="margin:0;line-height:{BODY_LINE_HEIGHT};font-size:15px;color:#333333;text-align:justify;">{content_html}</p>'
 

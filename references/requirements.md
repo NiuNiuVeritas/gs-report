@@ -21,7 +21,7 @@ The default mode is complete transfer, not editorial rewriting. Preserve every W
 
 Preserve explicit Word bold runs in body paragraphs as `<strong>...</strong>`.
 
-Preserve Word body bullets. If a Word body paragraph has numbering/bullet properties, render a visible `·` marker in the generated material and verify expected/actual body bullet counts.
+Preserve Word body bullets. If a Word body paragraph has numbering/bullet properties, render it as a native `<li>` bullet in the generated material and verify expected/actual body bullet counts.
 
 Do not output the author/source metadata row under the title; WeChat account settings handle author metadata.
 
@@ -31,7 +31,7 @@ For appendix section titles, remove leading labels such as `附录一` and `附�
 
 Use the first-page `核心观点` area. Preserve its meaning and order while fitting the existing template. Use Chinese numerals. Treat Word paragraph style IDs `20` and `23` as known summary-body starts; keep the converter and verifier style ID lists in sync.
 
-Render Word bullet paragraphs as `·` marker paragraphs with hanging indent. Avoid `<ul>/<li>` in the summary because WeChat's editor can widen list layout beyond the summary frame when pasted from a browser.
+Render Word bullet paragraphs as native `<li>` bullets with controlled inline width styles so copied WeChat drafts retain browser/WeChat `li::marker` behavior.
 
 ## Text Spacing
 
