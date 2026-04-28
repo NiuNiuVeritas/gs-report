@@ -21,9 +21,13 @@ The default mode is complete transfer, not editorial rewriting. Preserve every W
 
 Preserve explicit Word bold runs in body paragraphs as `<strong>...</strong>`.
 
+Do not output the author/source metadata row under the title; WeChat account settings handle author metadata.
+
 ## Summary
 
 Use the first-page `核心观点` area. Preserve its meaning and order while fitting the existing template. Use Chinese numerals.
+
+Render Word bullet paragraphs as `·` marker paragraphs with hanging indent. Avoid `<ul>/<li>` in the summary because WeChat's editor can widen list layout beyond the summary frame when pasted from a browser.
 
 ## Text Spacing
 

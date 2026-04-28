@@ -46,6 +46,10 @@ PROFILE_CARD = (
 
 CN_NUMERALS = "一二三四五六七八九十"
 BODY_LINE_HEIGHT = "1.6"
+SUMMARY_TEXT_STYLE = (
+    f"margin:0;line-height:{BODY_LINE_HEIGHT};font-size:15px;color:#333333;"
+    "text-align:justify;box-sizing:border-box;max-width:100%;overflow-wrap:break-word;"
+)
 
 
 @dataclass
@@ -272,26 +276,24 @@ def extract_summary(document: Document) -> list[tuple[str, list[tuple[str, bool,
 
 def render_summary(groups: list[tuple[str, list[tuple[str, bool, str]]]]) -> str:
     parts = [
-        '<section style="margin:12px 0 22px 0;padding:18px 16px;border:1px solid #d6d6d6;border-radius:6px;background:#f7f7f7;">',
+        '<section style="box-sizing:border-box;width:100%;max-width:100%;margin:12px 0 22px 0;padding:18px 16px;border:1px solid #d6d6d6;border-radius:6px;background:#f7f7f7;overflow:hidden;">',
         '<section style="text-align:center;margin:-30px 0 12px 0;"><section style="display:inline-block;background:#0f4c81;color:#ffffff;font-weight:700;font-size:15px;letter-spacing:2px;padding:8px 20px;border-radius:6px;">报告摘要</section></section>',
     ]
     for index, (heading, items) in enumerate(groups, 1):
         numeral = CN_NUMERALS[index - 1] if index <= len(CN_NUMERALS) else str(index)
         parts.append(
-            f'<p style="margin:0;line-height:{BODY_LINE_HEIGHT};font-size:15px;">'
+            f'<p style="margin:0;line-height:{BODY_LINE_HEIGHT};font-size:15px;box-sizing:border-box;max-width:100%;">'
             f'<span style="color:#c00000;font-weight:700;">{numeral}、{escape(heading)}</span></p>'
         )
         bullet_items = [item for item in items if item[1]]
         plain_items = [item for item in items if not item[1]]
         for _, _, item_html in plain_items:
-            parts.append(
-                f'<p style="margin:0;line-height:{BODY_LINE_HEIGHT};font-size:15px;color:#333333;text-align:justify;">{item_html}</p>'
-            )
+            parts.append(f'<p style="{SUMMARY_TEXT_STYLE}">{item_html}</p>')
         if bullet_items:
-            parts.append(f'<ul style="margin:0 0 0 22px;padding:0;line-height:{BODY_LINE_HEIGHT};font-size:15px;color:#333333;">')
             for _, _, item_html in bullet_items:
-                parts.append(f"<li>{item_html}</li>")
-            parts.append("</ul>")
+                parts.append(
+                    f'<p data-gs-summary-bullet="true" style="{SUMMARY_TEXT_STYLE}padding-left:1em;text-indent:-1em;">·&nbsp;{item_html}</p>'
+                )
     parts.append("</section>")
     return "\n\n".join(parts)
 
@@ -407,6 +409,7 @@ def write_outputs(markdown: str, output_dir: Path, slug: str, title: str) -> tup
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>{escape(title)}</title>
 <style>
+* {{ box-sizing: border-box; }}
 body {{ max-width: 720px; margin: 24px auto; padding: 0 16px; font-family: -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; color:#333; }}
 h1 {{ font-size: 22px; line-height: 1.35; margin: 0 0 12px; }}
 img {{ max-width: 100%; }}

@@ -174,7 +174,7 @@ def main() -> None:
     summary_text_rows = [row for row in summary_rows if not row[0].startswith("风险提示：")]
     missing_summary: list[str] = [row for row, _ in summary_text_rows if normalized(row) not in summary_text]
     expected_summary_bullets = sum(1 for _, is_bullet in summary_rows if is_bullet)
-    actual_summary_bullets = len(re.findall(r"<li>", summary_raw))
+    actual_summary_bullets = len(re.findall(r'data-gs-summary-bullet="true"', summary_raw))
     missing_markers: list[str] = []
     checked_markers = 0
     started = False
