@@ -61,6 +61,15 @@ def paragraph_text(paragraph: Paragraph) -> str:
     return ("".join(run.text for run in paragraph.runs).strip() or paragraph.text.strip()).replace("\uf06c", "").strip()
 
 
+def paragraph_is_bullet(paragraph: Paragraph) -> bool:
+    numid = paragraph._p.xpath("./w:pPr/w:numPr/w:numId/@w:val")
+    return bool(numid)
+
+
+def clean_heading_title(value: str) -> str:
+    return re.sub(r"^附录[一二三四五六七八九十]+[：:、.\s]*", "", value).strip() or value
+
+
 def run_is_bold(run) -> bool:
     if run.bold is True:
         return True
@@ -185,6 +194,7 @@ def main() -> None:
     started = False
     figure_count = 0
     table_count = 0
+    expected_body_bullets = 0
 
     for block in iter_blocks(document):
         if isinstance(block, Paragraph):
@@ -202,9 +212,12 @@ def main() -> None:
                 "国信研报正文-4.正文",
             }:
                 checked_paragraphs += 1
-                if normalized(source) not in text:
+                expected_source = clean_heading_title(source) if style != "国信研报正文-4.正文" else source
+                if normalized(expected_source) not in text:
                     missing_paragraphs.append(source)
                 if style == "国信研报正文-4.正文":
+                    if paragraph_is_bullet(block):
+                        expected_body_bullets += 1
                     for segment in paragraph_bold_segments(block):
                         bold_segments_checked += 1
                         pattern = re.compile(r"<strong>\s*" + re.escape(html.escape(segment)) + r"\s*</strong>")
@@ -232,11 +245,10 @@ def main() -> None:
     unresolved = re.findall(r"\{\{[^}]+\}\}", markdown)
     img_refs = re.findall(r'<img src="([^"]+)"', markdown)
     missing_images = [ref for ref in img_refs if not (args.markdown.parent / ref).exists()]
+    actual_body_bullets = len(re.findall(r'data-gs-body-bullet="true"', markdown))
     footer_checks = {
         "source_note": "注：本文选自国信证券于" in markdown,
         "analyst": "分析师：" in markdown and re.search(r"S\d{13}", markdown) is not None,
-        "risk": "风险提示：" in markdown,
-        "profile": "mp-common-profile" in markdown,
         "law": "law.png" in markdown,
     }
 
@@ -248,6 +260,8 @@ def main() -> None:
     print(f"summary_rows_missing={len(missing_summary)}")
     print(f"summary_bullets_expected={expected_summary_bullets}")
     print(f"summary_bullets_actual={actual_summary_bullets}")
+    print(f"body_bullets_expected={expected_body_bullets}")
+    print(f"body_bullets_actual={actual_body_bullets}")
     print(f"markers_checked={checked_markers}")
     print(f"markers_missing={len(missing_markers)}")
     print(f"image_refs={len(img_refs)}")
@@ -261,6 +275,7 @@ def main() -> None:
         or missing_bold_segments
         or missing_summary
         or expected_summary_bullets != actual_summary_bullets
+        or expected_body_bullets != actual_body_bullets
         or missing_markers
         or missing_images
         or unresolved

@@ -96,6 +96,15 @@ def paragraph_text(paragraph: Paragraph) -> str:
     return clean_text("".join(run.text for run in paragraph.runs) or paragraph.text)
 
 
+def paragraph_is_bullet(paragraph: Paragraph) -> bool:
+    numid = paragraph._p.xpath("./w:pPr/w:numPr/w:numId/@w:val")
+    return bool(numid)
+
+
+def clean_heading_title(value: str) -> str:
+    return re.sub(r"^附录[一二三四五六七八九十]+[：:、.\s]*", "", value).strip() or value
+
+
 def row_unique_texts(row) -> list[str]:
     texts: list[str] = []
     for cell in row.cells:
@@ -331,7 +340,12 @@ def render_h2(number: int, title: str) -> str:
 </section>"""
 
 
-def render_paragraph(content_html: str) -> str:
+def render_paragraph(content_html: str, is_bullet: bool = False) -> str:
+    if is_bullet:
+        return (
+            f'<p data-gs-body-bullet="true" style="margin:0;line-height:{BODY_LINE_HEIGHT};font-size:15px;'
+            f'color:#333333;text-align:justify;padding-left:1em;text-indent:-1em;">·&nbsp;{content_html}</p>'
+        )
     return f'<p style="margin:0;line-height:{BODY_LINE_HEIGHT};font-size:15px;color:#333333;text-align:justify;">{content_html}</p>'
 
 
@@ -350,8 +364,6 @@ def render_footer(metadata: Metadata, asset_rel: str) -> str:
         )
     parts.extend(
         [
-            f'<p style="margin:0;line-height:{BODY_LINE_HEIGHT};font-size:15px;font-weight:700;color:#333333;">{escape(RISK_PROMPT)}</p>',
-            PROFILE_CARD,
             f'<p style="margin:18px 0 0 0;"><img src="{escape(asset_rel)}" alt="法律声明" style="display:block;width:100%;height:auto;margin:0 auto;border:0;" /></p>',
         ]
     )
@@ -378,14 +390,14 @@ def build_markdown(document: Document, metadata: Metadata, asset_rel: str) -> st
                 started = True
                 h1_count += 1
                 h2_count = 0
-                parts.append(render_h1(h1_count, text))
+                parts.append(render_h1(h1_count, clean_heading_title(text)))
             elif started and style == "国信研报正文-2.正文二级标题":
                 h2_count += 1
-                parts.append(render_h2(h2_count, text))
+                parts.append(render_h2(h2_count, clean_heading_title(text)))
             elif started and style == "Normal" and text == "免责声明":
                 break
             elif started and style == "国信研报正文-4.正文":
-                parts.append(render_paragraph(paragraph_html(block)))
+                parts.append(render_paragraph(paragraph_html(block), paragraph_is_bullet(block)))
         elif started:
             title = table_title(block)
             if table_has_image(block):

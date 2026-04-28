@@ -21,7 +21,11 @@ The default mode is complete transfer, not editorial rewriting. Preserve every W
 
 Preserve explicit Word bold runs in body paragraphs as `<strong>...</strong>`.
 
+Preserve Word body bullets. If a Word body paragraph has numbering/bullet properties, render a visible `·` marker in the generated material and verify expected/actual body bullet counts.
+
 Do not output the author/source metadata row under the title; WeChat account settings handle author metadata.
+
+For appendix section titles, remove leading labels such as `附录一` and `附录二` but keep the remaining title text.
 
 ## Summary
 
@@ -39,6 +43,6 @@ Only output title marker lines for figures/tables. These lines are temporary loc
 
 ## Footer
 
-Footer order is source note, analysts, unchanged risk prompt, WeChat profile card, `law.png`.
+Footer order is source note, analysts, blank final risk prompt, `law.png`. Do not include the WeChat profile card in generated HTML.
 
 Ask the user if publication date, analyst name, analyst certificate number, or `law.png` is missing.

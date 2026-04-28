@@ -34,9 +34,11 @@ python scripts/verify_gs_report.py --docx <report.docx> --markdown <generated.md
 
 - Fully transfer Word body content from the first `国信研报正文-1.正文一级标题` paragraph to the `免责声明` boundary.
 - Do not excerpt, rewrite, summarize down, merge, or delete body paragraphs.
+- Preserve Word body bullets; body paragraphs with Word numbering/bullet properties must render with a visible `·` marker and verify with matching counts.
 - Preserve explicit Word bold runs in正文 paragraphs as `<strong>...</strong>`.
 - Omit Word contents/catalog pages and the full disclaimer/office-address appendix.
 - Do not output a title-area author/source line; the WeChat account config handles author metadata.
+- Remove leading appendix labels such as `附录一` and `附录二` from appendix section titles while preserving the rest of the title.
 - Extract the top `报告摘要` from the first-page `核心观点` area and format it with the base template style.
 - Treat Word paragraph style IDs `20` and `23` as known `核心观点` summary-body starts; keep converter and verifier in sync when adding more IDs.
 - Use Chinese numerals `一、二、三` for summary points.
@@ -57,9 +59,8 @@ Use this footer order:
 
 1. `注：本文选自国信证券于{发布日期}发布的研究报告《{报告标题}》`
 2. One line per analyst: `分析师：{姓名} {证书号}`
-3. The standard risk prompt.
-4. The `量化藏经阁` WeChat profile card.
-5. `law.png` legal declaration image.
+3. Leave the final risk-prompt text blank.
+4. `law.png` legal declaration image.
 
 The converter should auto-extract publication date from the first-page header and analysts from the first-page analyst block. If either is missing, rerun with `--publication-date` or `--analyst`.
 
