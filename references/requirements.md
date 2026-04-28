@@ -31,6 +31,8 @@ For appendix section titles, remove leading labels such as `附录一` and `附�
 
 Use the first-page `核心观点` area. Preserve its meaning and order while fitting the existing template. Use Chinese numerals. Treat Word paragraph style IDs `20` and `23` as known summary-body starts; keep the converter and verifier style ID lists in sync.
 
+Render the `报告摘要` badge with the established blue center label and two dark-blue corner triangles. Keep the badge inside the summary frame rather than using a negative top offset, so it remains visible even when no title precedes the summary.
+
 Render Word bullet paragraphs as native `<li>` bullets with controlled inline width styles so copied WeChat drafts retain browser/WeChat `li::marker` behavior.
 
 ## Text Spacing

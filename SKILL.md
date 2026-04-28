@@ -43,6 +43,7 @@ python scripts/verify_gs_report.py --docx <report.docx> --markdown <generated.md
 - Treat Word paragraph style IDs `20` and `23` as known `核心观点` summary-body starts; keep converter and verifier in sync when adding more IDs.
 - Use Chinese numerals `一、二、三` for summary points.
 - Use default body line-height `1.6` with paragraph before/after spacing `0`.
+- Render the `报告摘要` badge with the established blue center label and two dark-blue corner triangles; keep it inside the summary frame so it is not clipped when no title precedes the summary.
 - Keep summary blocks WeChat-editor safe: all summary containers use `box-sizing:border-box;width:100%;max-width:100%`, and summary bullets are rendered as native `<li>` bullets with controlled inline width styles.
 - Set the `总结` section's top margin to `0`.
 
