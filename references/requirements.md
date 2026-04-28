@@ -25,7 +25,7 @@ Do not output the author/source metadata row under the title; WeChat account set
 
 ## Summary
 
-Use the first-page `核心观点` area. Preserve its meaning and order while fitting the existing template. Use Chinese numerals.
+Use the first-page `核心观点` area. Preserve its meaning and order while fitting the existing template. Use Chinese numerals. Treat Word paragraph style IDs `20` and `23` as known summary-body starts; keep the converter and verifier style ID lists in sync.
 
 Render Word bullet paragraphs as `·` marker paragraphs with hanging indent. Avoid `<ul>/<li>` in the summary because WeChat's editor can widen list layout beyond the summary frame when pasted from a browser.
 

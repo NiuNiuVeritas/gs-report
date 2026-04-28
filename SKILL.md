@@ -38,6 +38,7 @@ python scripts/verify_gs_report.py --docx <report.docx> --markdown <generated.md
 - Omit Word contents/catalog pages and the full disclaimer/office-address appendix.
 - Do not output a title-area author/source line; the WeChat account config handles author metadata.
 - Extract the top `报告摘要` from the first-page `核心观点` area and format it with the base template style.
+- Treat Word paragraph style IDs `20` and `23` as known `核心观点` summary-body starts; keep converter and verifier in sync when adding more IDs.
 - Use Chinese numerals `一、二、三` for summary points.
 - Use default body line-height `1.6` with paragraph before/after spacing `0`.
 - Keep summary blocks WeChat-editor safe: all summary containers use `box-sizing:border-box;width:100%;max-width:100%`, and summary bullets are rendered as `·` marker paragraphs rather than `<ul>/<li>` lists.

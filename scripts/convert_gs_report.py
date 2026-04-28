@@ -46,6 +46,7 @@ PROFILE_CARD = (
 
 CN_NUMERALS = "一二三四五六七八九十"
 BODY_LINE_HEIGHT = "1.6"
+SUMMARY_BODY_STYLE_IDS = {"20", "23"}
 SUMMARY_TEXT_STYLE = (
     f"margin:0;line-height:{BODY_LINE_HEIGHT};font-size:15px;color:#333333;"
     "text-align:justify;box-sizing:border-box;max-width:100%;overflow-wrap:break-word;"
@@ -66,6 +67,10 @@ def clean_text(value: str | None) -> str:
     value = value.replace("\uf06c", "").replace("\xa0", " ")
     value = re.sub(r"[ \t]+", " ", value)
     return value.strip()
+
+
+def is_summary_body_style(style_values: list[str]) -> bool:
+    return any(style in SUMMARY_BODY_STYLE_IDS for style in style_values)
 
 
 def normalize_filename(value: str) -> str:
@@ -241,7 +246,7 @@ def extract_summary(document: Document) -> list[tuple[str, list[tuple[str, bool,
     for text, is_bullet, style, inline_html in paragraphs[start + 1 :]:
         if text.startswith("风险提示："):
             break
-        if "23" in style:
+        if is_summary_body_style(style):
             in_core_body = True
         if not in_core_body:
             continue

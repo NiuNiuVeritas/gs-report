@@ -20,6 +20,7 @@ NS = {
     "v": "urn:schemas-microsoft-com:vml",
     "r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
 }
+SUMMARY_BODY_STYLE_IDS = {"20", "23"}
 
 
 class TextExtractor(HTMLParser):
@@ -36,6 +37,10 @@ def normalized(value: str) -> str:
     value = value.replace("\uf06c", "")
     value = re.sub(r"\s+", "", value)
     return value
+
+
+def is_summary_body_style(style_values: list[str]) -> bool:
+    return any(style in SUMMARY_BODY_STYLE_IDS for style in style_values)
 
 
 def visible_text(markdown: str) -> str:
@@ -134,7 +139,7 @@ def extract_core_summary_rows(document: Document) -> list[tuple[str, bool]]:
     for text, is_bullet, style in paragraphs[start + 1 :]:
         if text.startswith("风险提示："):
             break
-        if "23" in style:
+        if is_summary_body_style(style):
             in_core_body = True
         if in_core_body:
             rows.append((text, is_bullet))
