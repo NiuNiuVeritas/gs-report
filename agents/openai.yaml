@@ -1,0 +1,3 @@
+display_name: GS Report
+short_description: Convert Guosen reports to WeChat drafts
+default_prompt: Convert this Word research report into WeChat Markdown and HTML using the GS report workflow.
