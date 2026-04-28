@@ -15,6 +15,7 @@ from lxml import etree
 
 
 NS = {
+    "w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
     "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
     "v": "urn:schemas-microsoft-com:vml",
     "r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
@@ -77,6 +78,51 @@ def table_title(table: Table) -> str:
     return titles[0] if titles else "图表"
 
 
+def clean_text(value: str) -> str:
+    value = value.replace("\uf06c", "").replace("\xa0", " ")
+    value = re.sub(r"[ \t]+", " ", value)
+    return value.strip()
+
+
+def iter_table_paragraph_nodes(document: Document):
+    for table in document.tables:
+        root = etree.fromstring(table._element.xml.encode("utf-8"))
+        for pnode in root.xpath(".//w:p", namespaces=NS):
+            text = clean_text("".join(pnode.xpath(".//w:t/text()", namespaces=NS)))
+            if not text:
+                continue
+            style = pnode.xpath("./w:pPr/w:pStyle/@w:val", namespaces=NS)
+            numid = pnode.xpath("./w:pPr/w:numPr/w:numId/@w:val", namespaces=NS)
+            yield text, bool(numid), style
+
+
+def extract_core_summary_rows(document: Document) -> list[tuple[str, bool]]:
+    paragraphs = list(iter_table_paragraph_nodes(document))
+    start = next((index for index, item in enumerate(paragraphs) if item[0] == "核心观点"), None)
+    if start is None:
+        return []
+    rows: list[tuple[str, bool]] = []
+    in_core_body = False
+    for text, is_bullet, style in paragraphs[start + 1 :]:
+        if text.startswith("风险提示："):
+            break
+        if "23" in style:
+            in_core_body = True
+        if in_core_body:
+            rows.append((text, is_bullet))
+    return rows
+
+
+def summary_block(markdown: str) -> str:
+    start = markdown.find("报告摘要")
+    if start == -1:
+        return ""
+    end = markdown.find('background:#343d5d;color:#ffffff', start)
+    if end == -1:
+        return markdown[start:]
+    return markdown[start:end]
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Verify GS report WeChat output against the source Word report.")
     parser.add_argument("--docx", required=True, type=Path)
@@ -89,9 +135,16 @@ def main() -> None:
     document = Document(args.docx)
     markdown = args.markdown.read_text(encoding="utf-8")
     text = visible_text(markdown)
+    summary_raw = summary_block(markdown)
+    summary_text = visible_text(summary_raw)
 
     missing_paragraphs: list[str] = []
     checked_paragraphs = 0
+    summary_rows = extract_core_summary_rows(document)
+    summary_text_rows = [row for row in summary_rows if not row[0].startswith("风险提示：")]
+    missing_summary: list[str] = [row for row, _ in summary_text_rows if normalized(row) not in summary_text]
+    expected_summary_bullets = sum(1 for _, is_bullet in summary_rows if is_bullet)
+    actual_summary_bullets = len(re.findall(r"<li>", summary_raw))
     missing_markers: list[str] = []
     checked_markers = 0
     started = False
@@ -148,6 +201,10 @@ def main() -> None:
 
     print(f"paragraphs_checked={checked_paragraphs}")
     print(f"paragraphs_missing={len(missing_paragraphs)}")
+    print(f"summary_rows_checked={len(summary_text_rows)}")
+    print(f"summary_rows_missing={len(missing_summary)}")
+    print(f"summary_bullets_expected={expected_summary_bullets}")
+    print(f"summary_bullets_actual={actual_summary_bullets}")
     print(f"markers_checked={checked_markers}")
     print(f"markers_missing={len(missing_markers)}")
     print(f"image_refs={len(img_refs)}")
@@ -156,8 +213,18 @@ def main() -> None:
     for key, ok in footer_checks.items():
         print(f"footer_{key}={ok}")
 
-    failed = missing_paragraphs or missing_markers or missing_images or unresolved or not all(footer_checks.values())
+    failed = (
+        missing_paragraphs
+        or missing_summary
+        or expected_summary_bullets != actual_summary_bullets
+        or missing_markers
+        or missing_images
+        or unresolved
+        or not all(footer_checks.values())
+    )
     if failed:
+        for item in missing_summary[:20]:
+            print(f"MISSING_SUMMARY: {item[:200]}")
         for item in missing_paragraphs[:20]:
             print(f"MISSING_PARAGRAPH: {item[:200]}")
         for item in missing_markers[:20]:

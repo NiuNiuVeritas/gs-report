@@ -23,6 +23,10 @@ The default mode is complete transfer, not editorial rewriting. Preserve every W
 
 Use the first-page `核心观点` area. Preserve its meaning and order while fitting the existing template. Use Chinese numerals.
 
+## Text Spacing
+
+Default line-height is `1.6`. Paragraph before/after spacing is `0`.
+
 ## Figures And Tables
 
 Only output title marker lines for figures/tables. These lines are temporary locators for the team to replace with Word screenshots. Do not output source-note lines as separate text.

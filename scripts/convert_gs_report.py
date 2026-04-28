@@ -45,6 +45,7 @@ PROFILE_CARD = (
 )
 
 CN_NUMERALS = "一二三四五六七八九十"
+BODY_LINE_HEIGHT = "1.6"
 
 
 @dataclass
@@ -128,9 +129,9 @@ def extract_title(nodes: list[str]) -> str:
         and not text.startswith("国信证券")
         and "证券研究报告" not in text
         and "GUOSEN" not in text
-        and text not in {"——", "↵"}
+        and text not in {"↵"}
     ]
-    title = "".join(candidates).strip("—- ")
+    title = "".join(candidates).strip()
     return title or "未命名研究报告"
 
 
@@ -168,65 +169,63 @@ def extract_analysts(nodes: list[str], overrides: list[str]) -> list[str]:
     return deduped
 
 
-def extract_summary(nodes: list[str]) -> list[tuple[str, list[str]]]:
-    if "核心观点" not in nodes:
+def iter_table_paragraph_nodes(document: Document):
+    for table in document.tables:
+        root = etree.fromstring(table._element.xml.encode("utf-8"))
+        for pnode in root.xpath(".//w:p", namespaces=NS):
+            text = clean_text("".join(pnode.xpath(".//w:t/text()", namespaces=NS)))
+            if not text:
+                continue
+            style = pnode.xpath("./w:pPr/w:pStyle/@w:val", namespaces=NS)
+            numid = pnode.xpath("./w:pPr/w:numPr/w:numId/@w:val", namespaces=NS)
+            yield text, bool(numid), style
+
+
+def extract_summary(document: Document) -> list[tuple[str, list[tuple[str, bool]]]]:
+    paragraphs = list(iter_table_paragraph_nodes(document))
+    start = next((index for index, item in enumerate(paragraphs) if item[0] == "核心观点"), None)
+    if start is None:
         raise SystemExit("Missing first-page 核心观点 area. Provide or add summary extraction support.")
-    start = nodes.index("核心观点") + 1
-    end = nodes.index("风险提示：") if "风险提示：" in nodes[start:] else min(len(nodes), start + 80)
-    segment = nodes[start:end]
-    stop_prefixes = ("金融工程", "证券分析师", "联系人", "相关研究报告")
-    filtered = [text for text in segment if text and not text.startswith(stop_prefixes)]
-    filtered = [text for text in filtered if not re.match(r"^[\d\-@.A-Za-z_]+$", text)]
 
-    groups: list[tuple[str, list[str]]] = []
+    core_rows: list[tuple[str, bool]] = []
+    in_core_body = False
+    for text, is_bullet, style in paragraphs[start + 1 :]:
+        if text.startswith("风险提示："):
+            break
+        if "23" in style:
+            in_core_body = True
+        if not in_core_body:
+            continue
+        core_rows.append((text, is_bullet))
+
+    groups: list[tuple[str, list[tuple[str, bool]]]] = []
     current_heading = ""
-    current_items: list[str] = []
-    buffer: list[str] = []
-
-    def flush_buffer() -> None:
-        nonlocal current_heading, current_items, buffer
-        if buffer:
-            text = clean_text("".join(buffer))
-            if text:
-                current_items.append(text)
-            buffer = []
-
-    heading_patterns = (
-        "投资价值分析",
-        "医疗行业",
-        "指数",
-        "ETF",
-        "优选",
-        "总结",
-    )
-
-    for text in filtered:
+    current_items: list[tuple[str, bool]] = []
+    for index, (text, is_bullet) in enumerate(core_rows):
+        next_is_body = index + 1 < len(core_rows)
         looks_heading = (
-            len(text) <= 35
-            and not text.endswith("。")
-            and any(token in text for token in heading_patterns)
+            not is_bullet
+            and next_is_body
+            and len(text) <= 45
+            and not text.endswith(("。", "；", "，", "、"))
         )
         if looks_heading:
-            flush_buffer()
             if current_heading:
                 groups.append((current_heading, current_items))
             current_heading = text
             current_items = []
-        else:
-            buffer.append(text)
-            if text.endswith(("。", "；", "%。")):
-                flush_buffer()
-    flush_buffer()
+        elif current_heading:
+            current_items.append((text, is_bullet))
+
     if current_heading:
         groups.append((current_heading, current_items))
-
     groups = [(heading, items) for heading, items in groups if items]
-    if not groups and filtered:
-        groups = [("核心观点", ["".join(filtered)])]
-    return groups[:10]
+    if not groups:
+        raise SystemExit("Failed to extract structured 核心观点 paragraphs.")
+    return groups
 
 
-def render_summary(groups: list[tuple[str, list[str]]]) -> str:
+def render_summary(groups: list[tuple[str, list[tuple[str, bool]]]]) -> str:
     parts = [
         '<section style="margin:12px 0 22px 0;padding:18px 16px;border:1px solid #d6d6d6;border-radius:6px;background:#f7f7f7;">',
         '<section style="text-align:center;margin:-30px 0 12px 0;"><section style="display:inline-block;background:#0f4c81;color:#ffffff;font-weight:700;font-size:15px;letter-spacing:2px;padding:8px 20px;border-radius:6px;">报告摘要</section></section>',
@@ -234,13 +233,20 @@ def render_summary(groups: list[tuple[str, list[str]]]) -> str:
     for index, (heading, items) in enumerate(groups, 1):
         numeral = CN_NUMERALS[index - 1] if index <= len(CN_NUMERALS) else str(index)
         parts.append(
-            f'<p style="margin:0 0 4px 0;line-height:1.75;font-size:15px;">'
+            f'<p style="margin:0;line-height:{BODY_LINE_HEIGHT};font-size:15px;">'
             f'<span style="color:#c00000;font-weight:700;">{numeral}、{escape(heading)}</span></p>'
         )
-        parts.append('<ul style="margin:0 0 8px 22px;padding:0;line-height:1.8;font-size:15px;color:#333333;">')
-        for item in items:
-            parts.append(f"<li>{escape(item)}</li>")
-        parts.append("</ul>")
+        bullet_items = [item for item in items if item[1]]
+        plain_items = [item for item in items if not item[1]]
+        for item, _ in plain_items:
+            parts.append(
+                f'<p style="margin:0;line-height:{BODY_LINE_HEIGHT};font-size:15px;color:#333333;text-align:justify;">{escape(item)}</p>'
+            )
+        if bullet_items:
+            parts.append(f'<ul style="margin:0 0 0 22px;padding:0;line-height:{BODY_LINE_HEIGHT};font-size:15px;color:#333333;">')
+            for item, _ in bullet_items:
+                parts.append(f"<li>{escape(item)}</li>")
+            parts.append("</ul>")
     parts.append("</section>")
     return "\n\n".join(parts)
 
@@ -274,25 +280,25 @@ def render_h2(number: int, title: str) -> str:
 
 
 def render_paragraph(text: str) -> str:
-    return f'<p style="margin:10px 0;line-height:1.85;font-size:15px;color:#333333;text-align:justify;">{escape(text)}</p>'
+    return f'<p style="margin:0;line-height:{BODY_LINE_HEIGHT};font-size:15px;color:#333333;text-align:justify;">{escape(text)}</p>'
 
 
 def render_marker(kind: str, number: int, title: str) -> str:
-    return f'<p data-gs-marker="{kind}{number}" style="margin:12px 0 8px 0;line-height:1.55;font-size:14px;color:#333333;">{kind}{number}：{escape(title)}</p>'
+    return f'<p data-gs-marker="{kind}{number}" style="margin:0;line-height:{BODY_LINE_HEIGHT};font-size:14px;color:#333333;">{kind}{number}：{escape(title)}</p>'
 
 
 def render_footer(metadata: Metadata, asset_rel: str) -> str:
     parts = [
         '<section style="height:10px;line-height:0;font-size:0;">&nbsp;</section>',
-        f'<p style="margin:10px 0;line-height:1.8;font-size:15px;font-weight:700;color:#333333;">注：本文选自国信证券于{escape(metadata.publication_date)}发布的研究报告《{escape(metadata.title)}》</p>',
+        f'<p style="margin:0;line-height:{BODY_LINE_HEIGHT};font-size:15px;font-weight:700;color:#333333;">注：本文选自国信证券于{escape(metadata.publication_date)}发布的研究报告《{escape(metadata.title)}》</p>',
     ]
     for analyst in metadata.analysts:
         parts.append(
-            f'<p style="margin:4px 0;line-height:1.8;font-size:15px;font-weight:700;color:#333333;">分析师：{escape(analyst)}</p>'
+            f'<p style="margin:0;line-height:{BODY_LINE_HEIGHT};font-size:15px;font-weight:700;color:#333333;">分析师：{escape(analyst)}</p>'
         )
     parts.extend(
         [
-            f'<p style="margin:22px 0 12px 0;line-height:1.8;font-size:15px;font-weight:700;color:#333333;">{escape(RISK_PROMPT)}</p>',
+            f'<p style="margin:0;line-height:{BODY_LINE_HEIGHT};font-size:15px;font-weight:700;color:#333333;">{escape(RISK_PROMPT)}</p>',
             PROFILE_CARD,
             f'<p style="margin:18px 0 0 0;"><img src="{escape(asset_rel)}" alt="法律声明" style="display:block;width:100%;height:auto;margin:0 auto;border:0;" /></p>',
         ]
@@ -302,7 +308,7 @@ def render_footer(metadata: Metadata, asset_rel: str) -> str:
 
 def build_markdown(document: Document, metadata: Metadata, asset_rel: str) -> str:
     nodes = text_nodes(document)
-    groups = extract_summary(nodes)
+    groups = extract_summary(document)
     parts = [f"# {metadata.title}\n", render_summary(groups)]
 
     h1_count = 0

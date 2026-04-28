@@ -37,6 +37,7 @@ python scripts/verify_gs_report.py --docx <report.docx> --markdown <generated.md
 - Omit Word contents/catalog pages and the full disclaimer/office-address appendix.
 - Extract the top `报告摘要` from the first-page `核心观点` area and format it with the base template style.
 - Use Chinese numerals `一、二、三` for summary points.
+- Use default body line-height `1.6` with paragraph before/after spacing `0`.
 - Set the `总结` section's top margin to `0`.
 
 ## Figure And Table Rules
