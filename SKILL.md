@@ -34,6 +34,7 @@ python scripts/verify_gs_report.py --docx <report.docx> --markdown <generated.md
 
 - Fully transfer Word body content from the first `国信研报正文-1.正文一级标题` paragraph to the `免责声明` boundary.
 - Do not excerpt, rewrite, summarize down, merge, or delete body paragraphs.
+- Preserve explicit Word bold runs in正文 paragraphs as `<strong>...</strong>`.
 - Omit Word contents/catalog pages and the full disclaimer/office-address appendix.
 - Extract the top `报告摘要` from the first-page `核心观点` area and format it with the base template style.
 - Use Chinese numerals `一、二、三` for summary points.

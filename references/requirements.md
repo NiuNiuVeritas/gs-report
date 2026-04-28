@@ -19,6 +19,8 @@
 
 The default mode is complete transfer, not editorial rewriting. Preserve every Word body paragraph before `免责声明`. Exclude directory/catalog content and the full disclaimer/office-address appendix.
 
+Preserve explicit Word bold runs in body paragraphs as `<strong>...</strong>`.
+
 ## Summary
 
 Use the first-page `核心观点` area. Preserve its meaning and order while fitting the existing template. Use Chinese numerals.

@@ -56,6 +56,34 @@ def paragraph_text(paragraph: Paragraph) -> str:
     return ("".join(run.text for run in paragraph.runs).strip() or paragraph.text.strip()).replace("\uf06c", "").strip()
 
 
+def run_is_bold(run) -> bool:
+    if run.bold is True:
+        return True
+    bold_nodes = run._r.xpath("./w:rPr/w:b")
+    if not bold_nodes:
+        return False
+    value = bold_nodes[0].get(f"{{{NS['w']}}}val")
+    return value not in {"0", "false", "False", "off"}
+
+
+def paragraph_bold_segments(paragraph: Paragraph) -> list[str]:
+    segments: list[str] = []
+    current: list[str] = []
+    for run in paragraph.runs:
+        if run_is_bold(run):
+            current.append(run.text)
+        elif current:
+            text = "".join(current).strip()
+            if text:
+                segments.append(text)
+            current = []
+    if current:
+        text = "".join(current).strip()
+        if text:
+            segments.append(text)
+    return segments
+
+
 def row_unique_texts(row) -> list[str]:
     values: list[str] = []
     for cell in row.cells:
@@ -140,6 +168,8 @@ def main() -> None:
 
     missing_paragraphs: list[str] = []
     checked_paragraphs = 0
+    bold_segments_checked = 0
+    missing_bold_segments: list[str] = []
     summary_rows = extract_core_summary_rows(document)
     summary_text_rows = [row for row in summary_rows if not row[0].startswith("风险提示：")]
     missing_summary: list[str] = [row for row, _ in summary_text_rows if normalized(row) not in summary_text]
@@ -169,6 +199,12 @@ def main() -> None:
                 checked_paragraphs += 1
                 if normalized(source) not in text:
                     missing_paragraphs.append(source)
+                if style == "国信研报正文-4.正文":
+                    for segment in paragraph_bold_segments(block):
+                        bold_segments_checked += 1
+                        pattern = re.compile(r"<strong>\s*" + re.escape(html.escape(segment)) + r"\s*</strong>")
+                        if not pattern.search(markdown):
+                            missing_bold_segments.append(segment)
         elif started:
             title = table_title(block)
             if table_has_image(block):
@@ -201,6 +237,8 @@ def main() -> None:
 
     print(f"paragraphs_checked={checked_paragraphs}")
     print(f"paragraphs_missing={len(missing_paragraphs)}")
+    print(f"bold_segments_checked={bold_segments_checked}")
+    print(f"bold_segments_missing={len(missing_bold_segments)}")
     print(f"summary_rows_checked={len(summary_text_rows)}")
     print(f"summary_rows_missing={len(missing_summary)}")
     print(f"summary_bullets_expected={expected_summary_bullets}")
@@ -215,6 +253,7 @@ def main() -> None:
 
     failed = (
         missing_paragraphs
+        or missing_bold_segments
         or missing_summary
         or expected_summary_bullets != actual_summary_bullets
         or missing_markers
@@ -225,6 +264,8 @@ def main() -> None:
     if failed:
         for item in missing_summary[:20]:
             print(f"MISSING_SUMMARY: {item[:200]}")
+        for item in missing_bold_segments[:20]:
+            print(f"MISSING_BOLD: {item[:200]}")
         for item in missing_paragraphs[:20]:
             print(f"MISSING_PARAGRAPH: {item[:200]}")
         for item in missing_markers[:20]:

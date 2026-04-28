@@ -169,6 +169,51 @@ def extract_analysts(nodes: list[str], overrides: list[str]) -> list[str]:
     return deduped
 
 
+def xml_run_is_bold(rnode) -> bool:
+    bold_nodes = rnode.xpath("./w:rPr/w:b", namespaces=NS)
+    if not bold_nodes:
+        return False
+    value = bold_nodes[0].get(f"{{{NS['w']}}}val")
+    return value not in {"0", "false", "False", "off"}
+
+
+def paragraph_node_html(pnode) -> str:
+    parts: list[str] = []
+    for rnode in pnode.xpath("./w:r", namespaces=NS):
+        text = "".join(rnode.xpath(".//w:t/text()", namespaces=NS))
+        if not text:
+            continue
+        escaped = escape(text)
+        if xml_run_is_bold(rnode):
+            parts.append(f"<strong>{escaped}</strong>")
+        else:
+            parts.append(escaped)
+    return "".join(parts)
+
+
+def run_is_bold(run) -> bool:
+    if run.bold is True:
+        return True
+    bold_nodes = run._r.xpath("./w:rPr/w:b")
+    if not bold_nodes:
+        return False
+    value = bold_nodes[0].get(f"{{{NS['w']}}}val")
+    return value not in {"0", "false", "False", "off"}
+
+
+def paragraph_html(paragraph: Paragraph) -> str:
+    parts: list[str] = []
+    for run in paragraph.runs:
+        if not run.text:
+            continue
+        escaped = escape(run.text)
+        if run_is_bold(run):
+            parts.append(f"<strong>{escaped}</strong>")
+        else:
+            parts.append(escaped)
+    return "".join(parts) or escape(paragraph_text(paragraph))
+
+
 def iter_table_paragraph_nodes(document: Document):
     for table in document.tables:
         root = etree.fromstring(table._element.xml.encode("utf-8"))
@@ -178,30 +223,30 @@ def iter_table_paragraph_nodes(document: Document):
                 continue
             style = pnode.xpath("./w:pPr/w:pStyle/@w:val", namespaces=NS)
             numid = pnode.xpath("./w:pPr/w:numPr/w:numId/@w:val", namespaces=NS)
-            yield text, bool(numid), style
+            yield text, bool(numid), style, paragraph_node_html(pnode)
 
 
-def extract_summary(document: Document) -> list[tuple[str, list[tuple[str, bool]]]]:
+def extract_summary(document: Document) -> list[tuple[str, list[tuple[str, bool, str]]]]:
     paragraphs = list(iter_table_paragraph_nodes(document))
     start = next((index for index, item in enumerate(paragraphs) if item[0] == "核心观点"), None)
     if start is None:
         raise SystemExit("Missing first-page 核心观点 area. Provide or add summary extraction support.")
 
-    core_rows: list[tuple[str, bool]] = []
+    core_rows: list[tuple[str, bool, str]] = []
     in_core_body = False
-    for text, is_bullet, style in paragraphs[start + 1 :]:
+    for text, is_bullet, style, inline_html in paragraphs[start + 1 :]:
         if text.startswith("风险提示："):
             break
         if "23" in style:
             in_core_body = True
         if not in_core_body:
             continue
-        core_rows.append((text, is_bullet))
+        core_rows.append((text, is_bullet, inline_html))
 
-    groups: list[tuple[str, list[tuple[str, bool]]]] = []
+    groups: list[tuple[str, list[tuple[str, bool, str]]]] = []
     current_heading = ""
-    current_items: list[tuple[str, bool]] = []
-    for index, (text, is_bullet) in enumerate(core_rows):
+    current_items: list[tuple[str, bool, str]] = []
+    for index, (text, is_bullet, inline_html) in enumerate(core_rows):
         next_is_body = index + 1 < len(core_rows)
         looks_heading = (
             not is_bullet
@@ -215,7 +260,7 @@ def extract_summary(document: Document) -> list[tuple[str, list[tuple[str, bool]
             current_heading = text
             current_items = []
         elif current_heading:
-            current_items.append((text, is_bullet))
+            current_items.append((text, is_bullet, inline_html))
 
     if current_heading:
         groups.append((current_heading, current_items))
@@ -225,7 +270,7 @@ def extract_summary(document: Document) -> list[tuple[str, list[tuple[str, bool]
     return groups
 
 
-def render_summary(groups: list[tuple[str, list[tuple[str, bool]]]]) -> str:
+def render_summary(groups: list[tuple[str, list[tuple[str, bool, str]]]]) -> str:
     parts = [
         '<section style="margin:12px 0 22px 0;padding:18px 16px;border:1px solid #d6d6d6;border-radius:6px;background:#f7f7f7;">',
         '<section style="text-align:center;margin:-30px 0 12px 0;"><section style="display:inline-block;background:#0f4c81;color:#ffffff;font-weight:700;font-size:15px;letter-spacing:2px;padding:8px 20px;border-radius:6px;">报告摘要</section></section>',
@@ -238,14 +283,14 @@ def render_summary(groups: list[tuple[str, list[tuple[str, bool]]]]) -> str:
         )
         bullet_items = [item for item in items if item[1]]
         plain_items = [item for item in items if not item[1]]
-        for item, _ in plain_items:
+        for _, _, item_html in plain_items:
             parts.append(
-                f'<p style="margin:0;line-height:{BODY_LINE_HEIGHT};font-size:15px;color:#333333;text-align:justify;">{escape(item)}</p>'
+                f'<p style="margin:0;line-height:{BODY_LINE_HEIGHT};font-size:15px;color:#333333;text-align:justify;">{item_html}</p>'
             )
         if bullet_items:
             parts.append(f'<ul style="margin:0 0 0 22px;padding:0;line-height:{BODY_LINE_HEIGHT};font-size:15px;color:#333333;">')
-            for item, _ in bullet_items:
-                parts.append(f"<li>{escape(item)}</li>")
+            for _, _, item_html in bullet_items:
+                parts.append(f"<li>{item_html}</li>")
             parts.append("</ul>")
     parts.append("</section>")
     return "\n\n".join(parts)
@@ -279,8 +324,8 @@ def render_h2(number: int, title: str) -> str:
 </section>"""
 
 
-def render_paragraph(text: str) -> str:
-    return f'<p style="margin:0;line-height:{BODY_LINE_HEIGHT};font-size:15px;color:#333333;text-align:justify;">{escape(text)}</p>'
+def render_paragraph(content_html: str) -> str:
+    return f'<p style="margin:0;line-height:{BODY_LINE_HEIGHT};font-size:15px;color:#333333;text-align:justify;">{content_html}</p>'
 
 
 def render_marker(kind: str, number: int, title: str) -> str:
@@ -333,7 +378,7 @@ def build_markdown(document: Document, metadata: Metadata, asset_rel: str) -> st
             elif started and style == "Normal" and text == "免责声明":
                 break
             elif started and style == "国信研报正文-4.正文":
-                parts.append(render_paragraph(text))
+                parts.append(render_paragraph(paragraph_html(block)))
         elif started:
             title = table_title(block)
             if table_has_image(block):
