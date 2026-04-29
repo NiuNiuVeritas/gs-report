@@ -33,6 +33,7 @@ python scripts/verify_gs_report.py --docx <report.docx> --markdown <generated.md
 ## Content Rules
 
 - Fully transfer Word body content from the first `国信研报正文-1.正文一级标题` paragraph to the `免责声明` boundary.
+- Zero tolerance for dropped body text: any paragraph in that range must be preserved, including `Normal` paragraphs that appear between figure/table markers or after chart commentary.
 - Do not excerpt, rewrite, summarize down, merge, or delete body paragraphs.
 - Preserve Word body bullets; body paragraphs with Word numbering/bullet properties must render as native `<li>` bullets and verify with matching counts.
 - Preserve explicit Word bold runs in正文 paragraphs as `<strong>...</strong>`.
@@ -51,6 +52,7 @@ python scripts/verify_gs_report.py --docx <report.docx> --markdown <generated.md
 
 - The team screenshots figures/tables directly from Word.
 - In generated material, include only the figure/table title positioning line.
+- Figure/table markers must never cause adjacent explanatory paragraphs to disappear. Text before, between, and after consecutive markers is mandatory body content.
 - Do not include duplicate source-note positioning lines; source notes come from the Word screenshot.
 - Do not add special locator styling such as extra bold, italic, slashes, or brackets.
 

@@ -49,6 +49,11 @@ def visible_text(markdown: str) -> str:
     return normalized("\n".join(parser.parts))
 
 
+def strong_visible_text(markdown: str) -> str:
+    parts = re.findall(r"<strong>(.*?)</strong>", markdown, flags=re.IGNORECASE | re.DOTALL)
+    return visible_text("\n".join(parts))
+
+
 def iter_blocks(document: Document):
     for child in document.element.body.iterchildren():
         if isinstance(child, CT_P):
@@ -96,6 +101,36 @@ def paragraph_bold_segments(paragraph: Paragraph) -> list[str]:
         if text:
             segments.append(text)
     return segments
+
+
+def is_heading_like_body_paragraph(text: str, bold_segments: list[str]) -> bool:
+    cleaned = text.strip()
+    if not cleaned or len(cleaned) > 40:
+        return False
+    if re.match(r"^[一二三四五六七八九十]+、", cleaned):
+        return True
+    if cleaned.startswith(("（一）", "（二）", "（三）", "（四）", "（五）")):
+        return True
+    if bold_segments and "".join(segment.strip() for segment in bold_segments) == cleaned:
+        return True
+    return False
+
+
+def should_render_body_bullet(
+    text: str,
+    is_bullet: bool,
+    bold_segments: list[str],
+    previous_heading_like: bool = False,
+) -> bool:
+    if not is_bullet:
+        return False
+    if len(text.strip()) > 60:
+        return False
+    if is_heading_like_body_paragraph(text, bold_segments):
+        return False
+    if previous_heading_like:
+        return False
+    return True
 
 
 def row_unique_texts(row) -> list[str]:
@@ -177,6 +212,7 @@ def main() -> None:
     document = Document(args.docx)
     markdown = args.markdown.read_text(encoding="utf-8")
     text = visible_text(markdown)
+    strong_text = strong_visible_text(markdown)
     summary_raw = summary_block(markdown)
     summary_text = visible_text(summary_raw)
 
@@ -195,6 +231,7 @@ def main() -> None:
     figure_count = 0
     table_count = 0
     expected_body_bullets = 0
+    previous_body_heading_like = False
 
     for block in iter_blocks(document):
         if isinstance(block, Paragraph):
@@ -204,26 +241,39 @@ def main() -> None:
             style = block.style.name
             if style == "国信研报正文-1.正文一级标题":
                 started = True
+                previous_body_heading_like = False
             if started and style == "Normal" and source == "免责声明":
                 break
             if started and style in {
                 "国信研报正文-1.正文一级标题",
                 "国信研报正文-2.正文二级标题",
                 "国信研报正文-4.正文",
+                "Normal",
             }:
                 checked_paragraphs += 1
-                expected_source = clean_heading_title(source) if style != "国信研报正文-4.正文" else source
+                expected_source = clean_heading_title(source) if style in {
+                    "国信研报正文-1.正文一级标题",
+                    "国信研报正文-2.正文二级标题",
+                } else source
                 if normalized(expected_source) not in text:
                     missing_paragraphs.append(source)
-                if style == "国信研报正文-4.正文":
-                    if paragraph_is_bullet(block):
+                if style in {"国信研报正文-4.正文", "Normal"}:
+                    bold_segments = paragraph_bold_segments(block)
+                    heading_like = is_heading_like_body_paragraph(source, bold_segments)
+                    if should_render_body_bullet(
+                        source, paragraph_is_bullet(block), bold_segments, previous_body_heading_like
+                    ):
                         expected_body_bullets += 1
-                    for segment in paragraph_bold_segments(block):
+                    previous_body_heading_like = heading_like
+                    for segment in bold_segments:
                         bold_segments_checked += 1
                         pattern = re.compile(r"<strong>\s*" + re.escape(html.escape(segment)) + r"\s*</strong>")
-                        if not pattern.search(markdown):
+                        if not pattern.search(markdown) and normalized(segment) not in strong_text:
                             missing_bold_segments.append(segment)
+                else:
+                    previous_body_heading_like = False
         elif started:
+            previous_body_heading_like = False
             title = table_title(block)
             if table_has_image(block):
                 root = etree.fromstring(block._element.xml.encode("utf-8"))

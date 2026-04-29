@@ -19,6 +19,8 @@
 
 The default mode is complete transfer, not editorial rewriting. Preserve every Word body paragraph before `免责声明`. Exclude directory/catalog content and the full disclaimer/office-address appendix.
 
+This is a zero-tolerance rule: do not drop `Normal` paragraphs that appear inside the body range, including paragraphs located between consecutive figure/table marker lines or immediately after chart commentary.
+
 Preserve explicit Word bold runs in body paragraphs as `<strong>...</strong>`.
 
 Preserve Word body bullets. If a Word body paragraph has numbering/bullet properties, render it as a native `<li>` bullet in the generated material and verify expected/actual body bullet counts.
@@ -34,6 +36,8 @@ Use the first-page `核心观点` area. Preserve its meaning and order while fit
 Render the `报告摘要` badge with the established blue center label and two dark-blue corner triangles. Keep the badge inside the summary frame rather than using a negative top offset, so it remains visible even when no title precedes the summary.
 
 Render Word bullet paragraphs as native `<li>` bullets with controlled inline width styles so copied WeChat drafts retain browser/WeChat `li::marker` behavior.
+
+Do not let figure/table marker insertion suppress surrounding explanatory text. Marker lines are locators only; all neighboring body paragraphs remain mandatory output and mandatory verification coverage.
 
 ## Text Spacing
 

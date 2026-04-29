@@ -197,15 +197,24 @@ def xml_run_is_bold(rnode) -> bool:
 
 def paragraph_node_html(pnode) -> str:
     parts: list[str] = []
+    current_parts: list[str] = []
+    current_bold: bool | None = None
     for rnode in pnode.xpath("./w:r", namespaces=NS):
         text = "".join(rnode.xpath(".//w:t/text()", namespaces=NS))
         if not text:
             continue
-        escaped = escape(text)
-        if xml_run_is_bold(rnode):
-            parts.append(f"<strong>{escaped}</strong>")
-        else:
-            parts.append(escaped)
+        is_bold = xml_run_is_bold(rnode)
+        if current_bold is None:
+            current_bold = is_bold
+        if is_bold != current_bold:
+            merged = escape("".join(current_parts))
+            parts.append(f"<strong>{merged}</strong>" if current_bold else merged)
+            current_parts = []
+            current_bold = is_bold
+        current_parts.append(text)
+    if current_parts:
+        merged = escape("".join(current_parts))
+        parts.append(f"<strong>{merged}</strong>" if current_bold else merged)
     return "".join(parts)
 
 
@@ -221,15 +230,54 @@ def run_is_bold(run) -> bool:
 
 def paragraph_html(paragraph: Paragraph) -> str:
     parts: list[str] = []
+    current_parts: list[str] = []
+    current_bold: bool | None = None
     for run in paragraph.runs:
         if not run.text:
             continue
-        escaped = escape(run.text)
-        if run_is_bold(run):
-            parts.append(f"<strong>{escaped}</strong>")
-        else:
-            parts.append(escaped)
+        is_bold = run_is_bold(run)
+        if current_bold is None:
+            current_bold = is_bold
+        if is_bold != current_bold:
+            merged = escape("".join(current_parts))
+            parts.append(f"<strong>{merged}</strong>" if current_bold else merged)
+            current_parts = []
+            current_bold = is_bold
+        current_parts.append(run.text)
+    if current_parts:
+        merged = escape("".join(current_parts))
+        parts.append(f"<strong>{merged}</strong>" if current_bold else merged)
     return "".join(parts) or escape(paragraph_text(paragraph))
+
+
+def is_heading_like_body_paragraph(text: str, content_html: str = "") -> bool:
+    cleaned = clean_text(text)
+    if not cleaned or len(cleaned) > 40:
+        return False
+    if re.match(r"^[一二三四五六七八九十]+、", cleaned):
+        return True
+    if cleaned.startswith(("（一）", "（二）", "（三）", "（四）", "（五）")):
+        return True
+    if content_html and re.fullmatch(r"(?:<strong>.*?</strong>)+", content_html):
+        return True
+    return False
+
+
+def should_render_body_bullet(
+    text: str,
+    content_html: str,
+    is_bullet: bool,
+    previous_heading_like: bool = False,
+) -> bool:
+    if not is_bullet:
+        return False
+    if len(clean_text(text)) > 60:
+        return False
+    if is_heading_like_body_paragraph(text, content_html):
+        return False
+    if previous_heading_like:
+        return False
+    return True
 
 
 def iter_table_paragraph_nodes(document: Document):
@@ -261,6 +309,29 @@ def extract_summary(document: Document) -> list[tuple[str, list[tuple[str, bool,
             continue
         core_rows.append((text, is_bullet, inline_html))
 
+    if not core_rows or len(core_rows) <= 4:
+        fallback_rows: list[tuple[str, bool, str]] = []
+        after_related = False
+        in_report_list = False
+        for text, is_bullet, style, inline_html in paragraphs[start + 1 :]:
+            if text.startswith("风险提示："):
+                break
+            if text == "相关研究报告":
+                after_related = True
+                in_report_list = True
+                continue
+            if not after_related:
+                continue
+            is_related_report_line = text.startswith("《") and "》" in text
+            if in_report_list and is_related_report_line:
+                continue
+            if in_report_list and not is_related_report_line:
+                in_report_list = False
+            if not in_report_list:
+                fallback_rows.append((text, is_bullet, inline_html))
+        if fallback_rows:
+            core_rows = fallback_rows
+
     groups: list[tuple[str, list[tuple[str, bool, str]]]] = []
     current_heading = ""
     current_items: list[tuple[str, bool, str]] = []
@@ -283,6 +354,8 @@ def extract_summary(document: Document) -> list[tuple[str, list[tuple[str, bool,
     if current_heading:
         groups.append((current_heading, current_items))
     groups = [(heading, items) for heading, items in groups if items]
+    if not groups and core_rows:
+        return [("核心观点", core_rows)]
     if not groups:
         raise SystemExit("Failed to extract structured 核心观点 paragraphs.")
     return groups
@@ -395,6 +468,7 @@ def build_markdown(document: Document, metadata: Metadata, asset_rel: str) -> st
     figure_count = 0
     table_count = 0
     started = False
+    previous_body_heading_like = False
     for block in iter_blocks(document):
         if isinstance(block, Paragraph):
             text = paragraph_text(block)
@@ -405,15 +479,25 @@ def build_markdown(document: Document, metadata: Metadata, asset_rel: str) -> st
                 started = True
                 h1_count += 1
                 h2_count = 0
+                previous_body_heading_like = False
                 parts.append(render_h1(h1_count, clean_heading_title(text)))
             elif started and style == "国信研报正文-2.正文二级标题":
                 h2_count += 1
+                previous_body_heading_like = False
                 parts.append(render_h2(h2_count, clean_heading_title(text)))
             elif started and style == "Normal" and text == "免责声明":
                 break
-            elif started and style == "国信研报正文-4.正文":
-                parts.append(render_paragraph(paragraph_html(block), paragraph_is_bullet(block)))
+            elif started and style in {"国信研报正文-4.正文", "Normal"}:
+                content_html = paragraph_html(block)
+                is_bullet = paragraph_is_bullet(block)
+                heading_like = is_heading_like_body_paragraph(text, content_html)
+                render_as_bullet = should_render_body_bullet(
+                    text, content_html, is_bullet, previous_body_heading_like
+                )
+                parts.append(render_paragraph(content_html, render_as_bullet))
+                previous_body_heading_like = heading_like
         elif started:
+            previous_body_heading_like = False
             title = table_title(block)
             if table_has_image(block):
                 image_refs = etree.fromstring(block._element.xml.encode("utf-8")).xpath(
