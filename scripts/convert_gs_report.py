@@ -45,6 +45,7 @@ PROFILE_CARD = (
 )
 
 CN_NUMERALS = "一二三四五六七八九十"
+CN_NUMERAL_VALUES = {value: index for index, value in enumerate(CN_NUMERALS, 1)}
 BODY_LINE_HEIGHT = "1.6"
 SUMMARY_BODY_STYLE_IDS = {"20", "23"}
 SUMMARY_TEXT_STYLE = (
@@ -263,6 +264,69 @@ def is_heading_like_body_paragraph(text: str, content_html: str = "") -> bool:
     return False
 
 
+def chinese_heading_number(text: str) -> int | None:
+    match = re.match(r"^([一二三四五六七八九十]+)、", clean_text(text))
+    if not match:
+        return None
+    return CN_NUMERAL_VALUES.get(match.group(1))
+
+
+def is_unnumbered_bold_body_heading(text: str, content_html: str) -> bool:
+    cleaned = clean_text(text)
+    return (
+        bool(cleaned)
+        and len(cleaned) <= 40
+        and chinese_heading_number(cleaned) is None
+        and bool(re.fullmatch(r"(?:<strong>.*?</strong>)+", content_html))
+    )
+
+
+def infer_missing_body_heading_numbers(blocks: list[Paragraph | Table]) -> dict[int, str]:
+    inferred: dict[int, str] = {}
+    started = False
+    previous_number: int | None = None
+    pending: tuple[Paragraph, int] | None = None
+
+    for block in blocks:
+        if isinstance(block, Table):
+            continue
+        text = paragraph_text(block)
+        if not text:
+            continue
+        style = block.style.name
+        if style == "国信研报正文-1.正文一级标题":
+            started = True
+            previous_number = None
+            pending = None
+            continue
+        if not started:
+            continue
+        if style == "国信研报正文-2.正文二级标题":
+            previous_number = None
+            pending = None
+            continue
+        if style == "Normal" and text == "免责声明":
+            break
+        if style not in {"国信研报正文-4.正文", "Normal"}:
+            continue
+
+        content_html = paragraph_html(block)
+        current_number = chinese_heading_number(text)
+        if current_number is not None and is_heading_like_body_paragraph(text, content_html):
+            if pending and current_number == pending[1] + 2 and pending[1] < len(CN_NUMERALS):
+                inferred[id(pending[0]._p)] = CN_NUMERALS[pending[1]]
+            previous_number = current_number
+            pending = None
+        elif (
+            previous_number is not None
+            and pending is None
+            and is_unnumbered_bold_body_heading(text, content_html)
+        ):
+            pending = (block, previous_number)
+
+    return inferred
+
+
 def should_render_body_bullet(
     text: str,
     content_html: str,
@@ -290,6 +354,50 @@ def iter_table_paragraph_nodes(document: Document):
             style = pnode.xpath("./w:pPr/w:pStyle/@w:val", namespaces=NS)
             numid = pnode.xpath("./w:pPr/w:numPr/w:numId/@w:val", namespaces=NS)
             yield text, bool(numid), style, paragraph_node_html(pnode)
+
+
+def extract_summary_risk(document: Document) -> str:
+    paragraphs = list(iter_table_paragraph_nodes(document))
+    start = next((index for index, item in enumerate(paragraphs) if item[0] == "核心观点"), None)
+    if start is None:
+        return ""
+    for text, _, _, _ in paragraphs[start + 1 :]:
+        if text.startswith("风险提示："):
+            return text
+    return ""
+
+
+def leading_strong_summary_heading(inline_html: str) -> tuple[str, str] | None:
+    match = re.match(r"^<strong>([^<]{2,45})</strong>(.*)$", inline_html, flags=re.DOTALL)
+    if not match:
+        return None
+    heading = clean_text(html.unescape(match.group(1)))
+    remainder = match.group(2).strip()
+    if not heading or not remainder:
+        return None
+    return heading, remainder
+
+
+def group_summary_by_leading_strong(
+    rows: list[tuple[str, bool, str]],
+) -> list[tuple[str, list[tuple[str, bool, str]]]]:
+    groups: list[tuple[str, list[tuple[str, bool, str]]]] = []
+    current_heading = ""
+    current_items: list[tuple[str, bool, str]] = []
+
+    for text, is_bullet, inline_html in rows:
+        heading_match = None if is_bullet else leading_strong_summary_heading(inline_html)
+        if heading_match:
+            if current_heading:
+                groups.append((current_heading, current_items))
+            current_heading, remainder_html = heading_match
+            current_items = [(text, False, remainder_html)]
+        elif current_heading:
+            current_items.append((text, is_bullet, inline_html))
+
+    if current_heading:
+        groups.append((current_heading, current_items))
+    return [(heading, items) for heading, items in groups if items]
 
 
 def extract_summary(document: Document) -> list[tuple[str, list[tuple[str, bool, str]]]]:
@@ -354,8 +462,10 @@ def extract_summary(document: Document) -> list[tuple[str, list[tuple[str, bool,
     if current_heading:
         groups.append((current_heading, current_items))
     groups = [(heading, items) for heading, items in groups if items]
+    if not groups:
+        groups = group_summary_by_leading_strong(core_rows)
     if not groups and core_rows:
-        return [("核心观点", core_rows)]
+        return [("摘要要点", core_rows)]
     if not groups:
         raise SystemExit("Failed to extract structured 核心观点 paragraphs.")
     return groups
@@ -365,9 +475,9 @@ def render_summary(groups: list[tuple[str, list[tuple[str, bool, str]]]]) -> str
     parts = [
         '<section style="box-sizing:border-box;width:100%;max-width:100%;margin:12px 0 22px 0;padding:0 16px 18px 16px;border:1px solid #d6d6d6;border-radius:6px;background:#f7f7f7;overflow:hidden;">',
         '<section style="text-align:center;margin:0 0 12px 0;line-height:0;">'
-        '<section style="display:inline-block;vertical-align:top;border-right:0.4em solid rgb(4,55,90);border-bottom:0.4em solid rgb(4,55,90);box-sizing:border-box;line-height:0;max-width:5%;border-top:0.4em solid transparent !important;border-left:0.4em solid transparent !important;"><br /></section>'
+        '<section style="display:inline-block;vertical-align:top;border-right:0.4em solid rgb(87,161,218);border-bottom:0.4em solid rgb(87,161,218);box-sizing:border-box;line-height:0;max-width:5%;border-top:0.4em solid transparent !important;border-left:0.4em solid transparent !important;"><br /></section>'
         '<section style="padding:2px 5px;display:inline-block;vertical-align:top;border-radius:0 0 5px 5px;background-color:rgb(5,68,119);font-size:17px;line-height:1.6;color:rgb(255,255,255);box-sizing:border-box;max-width:90%;"><p style="margin:0;box-sizing:border-box;"><strong style="font-size:16px;">&nbsp;&nbsp;报 告 摘 要 &nbsp;</strong></p></section>'
-        '<section style="display:inline-block;vertical-align:top;border-bottom:0.4em solid rgb(4,55,90);border-left:0.4em solid rgb(4,55,90);box-sizing:border-box;line-height:0;max-width:5%;border-right:0.4em solid transparent !important;border-top:0.4em solid transparent !important;"><br /></section>'
+        '<section style="display:inline-block;vertical-align:top;border-bottom:0.4em solid rgb(87,161,218);border-left:0.4em solid rgb(87,161,218);box-sizing:border-box;line-height:0;max-width:5%;border-right:0.4em solid transparent !important;border-top:0.4em solid transparent !important;"><br /></section>'
         '</section>',
     ]
     for index, (heading, items) in enumerate(groups, 1):
@@ -441,7 +551,21 @@ def render_marker(kind: str, number: int, title: str) -> str:
     return f'<p data-gs-marker="{kind}{number}" style="margin:0;line-height:{BODY_LINE_HEIGHT};font-size:14px;color:#333333;">{kind}{number}：{escape(title)}</p>'
 
 
-def render_footer(metadata: Metadata, asset_rel: str) -> str:
+def normalize_risk_notice(rows: list[str]) -> str:
+    cleaned_rows = [clean_text(row) for row in rows if clean_text(row)]
+    if not cleaned_rows:
+        return ""
+    first = cleaned_rows[0]
+    if first.startswith("风险提示："):
+        return " ".join([first, *cleaned_rows[1:]])
+    return "风险提示：" + " ".join(cleaned_rows)
+
+
+def is_risk_appendix_boundary(text: str) -> bool:
+    return text.startswith(("附：", "附:"))
+
+
+def render_footer(metadata: Metadata, asset_rel: str, risk_notice: str = "") -> str:
     parts = [
         '<section style="height:10px;line-height:0;font-size:0;">&nbsp;</section>',
         f'<p style="margin:0;line-height:{BODY_LINE_HEIGHT};font-size:15px;font-weight:700;color:#333333;">注：本文选自国信证券于{escape(metadata.publication_date)}发布的研究报告《{escape(metadata.title)}》</p>',
@@ -449,6 +573,10 @@ def render_footer(metadata: Metadata, asset_rel: str) -> str:
     for analyst in metadata.analysts:
         parts.append(
             f'<p style="margin:0;line-height:{BODY_LINE_HEIGHT};font-size:15px;font-weight:700;color:#333333;">分析师：{escape(analyst)}</p>'
+        )
+    if risk_notice:
+        parts.append(
+            f'<p style="margin:0;line-height:{BODY_LINE_HEIGHT};font-size:15px;font-weight:700;color:#333333;">{escape(risk_notice)}</p>'
         )
     parts.extend(
         [
@@ -462,33 +590,63 @@ def build_markdown(document: Document, metadata: Metadata, asset_rel: str) -> st
     nodes = text_nodes(document)
     groups = extract_summary(document)
     parts = [f"# {metadata.title}\n", render_summary(groups)]
+    summary_risk_notice = extract_summary_risk(document)
+    body_risk_rows: list[str] = []
+    blocks = list(iter_blocks(document))
+    inferred_body_heading_numbers = infer_missing_body_heading_numbers(blocks)
 
     h1_count = 0
     h2_count = 0
     figure_count = 0
     table_count = 0
     started = False
+    collecting_risk = False
     previous_body_heading_like = False
-    for block in iter_blocks(document):
+    for block in blocks:
         if isinstance(block, Paragraph):
             text = paragraph_text(block)
             if not text:
                 continue
             style = block.style.name
+            title = clean_heading_title(text)
+            if collecting_risk:
+                if style == "Normal" and text == "免责声明":
+                    break
+                if style in {
+                    "国信研报正文-1.正文一级标题",
+                    "国信研报正文-2.正文二级标题",
+                } or is_risk_appendix_boundary(text):
+                    collecting_risk = False
+                else:
+                    if style in {"国信研报正文-4.正文", "Normal"}:
+                        body_risk_rows.append(text)
+                    continue
             if style == "国信研报正文-1.正文一级标题":
                 started = True
+                if title == "风险提示":
+                    collecting_risk = True
+                    previous_body_heading_like = False
+                    continue
                 h1_count += 1
                 h2_count = 0
                 previous_body_heading_like = False
-                parts.append(render_h1(h1_count, clean_heading_title(text)))
+                parts.append(render_h1(h1_count, title))
             elif started and style == "国信研报正文-2.正文二级标题":
                 h2_count += 1
                 previous_body_heading_like = False
-                parts.append(render_h2(h2_count, clean_heading_title(text)))
+                parts.append(render_h2(h2_count, title))
             elif started and style == "Normal" and text == "免责声明":
                 break
             elif started and style in {"国信研报正文-4.正文", "Normal"}:
                 content_html = paragraph_html(block)
+                inferred_number = inferred_body_heading_numbers.get(id(block._p))
+                if inferred_number:
+                    content_html = re.sub(
+                        r"^<strong>",
+                        f"<strong>{inferred_number}、",
+                        content_html,
+                        count=1,
+                    )
                 is_bullet = paragraph_is_bullet(block)
                 heading_like = is_heading_like_body_paragraph(text, content_html)
                 render_as_bullet = should_render_body_bullet(
@@ -498,6 +656,8 @@ def build_markdown(document: Document, metadata: Metadata, asset_rel: str) -> st
                 previous_body_heading_like = heading_like
         elif started:
             previous_body_heading_like = False
+            if collecting_risk:
+                continue
             title = table_title(block)
             if table_has_image(block):
                 image_refs = etree.fromstring(block._element.xml.encode("utf-8")).xpath(
@@ -510,7 +670,8 @@ def build_markdown(document: Document, metadata: Metadata, asset_rel: str) -> st
                 if title and len(block.rows) > 1:
                     table_count += 1
                     parts.append(render_marker("表", table_count, title))
-    parts.append(render_footer(metadata, asset_rel))
+    risk_notice = summary_risk_notice or normalize_risk_notice(body_risk_rows)
+    parts.append(render_footer(metadata, asset_rel, risk_notice))
     return "\n\n".join(part for part in parts if part) + "\n"
 
 

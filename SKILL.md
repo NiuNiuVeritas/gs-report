@@ -32,19 +32,21 @@ python scripts/verify_gs_report.py --docx <report.docx> --markdown <generated.md
 
 ## Content Rules
 
-- Fully transfer Word body content from the first `国信研报正文-1.正文一级标题` paragraph to the `免责声明` boundary.
-- Zero tolerance for dropped body text: any paragraph in that range must be preserved, including `Normal` paragraphs that appear between figure/table markers or after chart commentary.
+- Fully transfer Word body content from the first `国信研报正文-1.正文一级标题` paragraph to the `免责声明` boundary, except for the final `风险提示` section, which is relocated into the footer note block.
+- Zero tolerance for dropped body text: any paragraph in that range must be preserved, including `Normal` paragraphs that appear between figure/table markers or after chart commentary. The only formatting exception is the final risk prompt, which is moved to the footer rather than rendered in place.
 - Do not excerpt, rewrite, summarize down, merge, or delete body paragraphs.
 - Preserve Word body bullets; body paragraphs with Word numbering/bullet properties must render as native `<li>` bullets and verify with matching counts.
 - Preserve explicit Word bold runs in正文 paragraphs as `<strong>...</strong>`.
 - Omit Word contents/catalog pages and the full disclaimer/office-address appendix.
 - Do not output a title-area author/source line; the WeChat account config handles author metadata.
 - Remove leading appendix labels such as `附录一` and `附录二` from appendix section titles while preserving the rest of the title.
+- For normal-body headings, preserve author numbering when present. If a short fully bold unnumbered heading sits between numbered headings with a clear one-step gap, infer the missing Chinese numeral prefix for that heading only.
 - Extract the top `报告摘要` from the first-page `核心观点` area and format it with the base template style.
 - Treat Word paragraph style IDs `20` and `23` as known `核心观点` summary-body starts; keep converter and verifier in sync when adding more IDs.
+- Treat `核心观点` as the extraction-area label, not a summary point title. If no standalone summary headings exist, split paragraphs by short leading bold labels into numbered summary points.
 - Use Chinese numerals `一、二、三` for summary points.
 - Use default body line-height `1.6` with paragraph before/after spacing `0`.
-- Render the `报告摘要` badge with the established blue center label and two dark-blue corner triangles; keep it inside the summary frame so it is not clipped when no title precedes the summary.
+- Render the `报告摘要` badge with the established blue center label and two light-blue corner triangles matching the current design reference; keep it inside the summary frame so it is not clipped when no title precedes the summary.
 - Keep summary blocks WeChat-editor safe: all summary containers use `box-sizing:border-box;width:100%;max-width:100%`, and summary bullets are rendered as native `<li>` bullets with controlled inline width styles.
 - Set the `总结` section's top margin to `0`.
 
@@ -62,7 +64,7 @@ Use this footer order:
 
 1. `注：本文选自国信证券于{发布日期}发布的研究报告《{报告标题}》`
 2. One line per analyst: `分析师：{姓名} {证书号}`
-3. Leave the final risk-prompt text blank.
+3. One risk line: `风险提示：{风险内容}`; attach it to the footer note block and do not render it as a standalone chapter.
 4. `law.png` legal declaration image.
 
 The converter should auto-extract publication date from the first-page header and analysts from the first-page analyst block. If either is missing, rerun with `--publication-date` or `--analyst`.

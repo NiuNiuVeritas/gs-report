@@ -17,9 +17,9 @@
 
 ## Strictness
 
-The default mode is complete transfer, not editorial rewriting. Preserve every Word body paragraph before `免责声明`. Exclude directory/catalog content and the full disclaimer/office-address appendix.
+The default mode is complete transfer, not editorial rewriting. Preserve every Word body paragraph before `免责声明`, except for the final `风险提示` section, which is relocated into the footer note block. Exclude directory/catalog content and the full disclaimer/office-address appendix.
 
-This is a zero-tolerance rule: do not drop `Normal` paragraphs that appear inside the body range, including paragraphs located between consecutive figure/table marker lines or immediately after chart commentary.
+This is a zero-tolerance rule: do not drop `Normal` paragraphs that appear inside the body range, including paragraphs located between consecutive figure/table marker lines or immediately after chart commentary. The only formatting exception is the final risk prompt, which is moved to the footer rather than rendered in place.
 
 Preserve explicit Word bold runs in body paragraphs as `<strong>...</strong>`.
 
@@ -31,13 +31,15 @@ For appendix section titles, remove leading labels such as `附录一` and `附�
 
 ## Summary
 
-Use the first-page `核心观点` area. Preserve its meaning and order while fitting the existing template. Use Chinese numerals. Treat Word paragraph style IDs `20` and `23` as known summary-body starts; keep the converter and verifier style ID lists in sync.
+Use the first-page `核心观点` area. Preserve its meaning and order while fitting the existing template. Use Chinese numerals. Treat Word paragraph style IDs `20` and `23` as known summary-body starts; keep the converter and verifier style ID lists in sync. `核心观点` is an extraction-area label, not a summary point title. When the summary has no standalone title paragraphs but has short leading bold labels inside paragraphs, split those labels into numbered summary points.
 
-Render the `报告摘要` badge with the established blue center label and two dark-blue corner triangles. Keep the badge inside the summary frame rather than using a negative top offset, so it remains visible even when no title precedes the summary.
+Render the `报告摘要` badge with the established blue center label and two light-blue corner triangles matching the current design reference. Keep the badge inside the summary frame rather than using a negative top offset, so it remains visible even when no title precedes the summary.
 
 Render Word bullet paragraphs as native `<li>` bullets with controlled inline width styles so copied WeChat drafts retain browser/WeChat `li::marker` behavior.
 
 Do not let figure/table marker insertion suppress surrounding explanatory text. Marker lines are locators only; all neighboring body paragraphs remain mandatory output and mandatory verification coverage.
+
+For body headings that are stored as normal body paragraphs, preserve author numbering when present. If a short fully bold unnumbered body heading sits between numbered headings with a clear one-step gap, infer the missing Chinese numeral prefix for that heading only.
 
 ## Text Spacing
 
@@ -49,6 +51,6 @@ Only output title marker lines for figures/tables. These lines are temporary loc
 
 ## Footer
 
-Footer order is source note, analysts, blank final risk prompt, `law.png`. Do not include the WeChat profile card in generated HTML.
+Footer order is source note, analysts, risk prompt, `law.png`. Do not render the final risk prompt as its own body chapter; attach it to the footer note block in the same bold paragraph style as the note and analyst lines. Do not include the WeChat profile card in generated HTML.
 
 Ask the user if publication date, analyst name, analyst certificate number, or `law.png` is missing.

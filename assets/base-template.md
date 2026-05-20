@@ -4,11 +4,11 @@
 {{作者A}}、{{作者B}}&nbsp;&nbsp;{{机构名}}&nbsp;&nbsp;{{日期}} {{时间}}
 </section>
 
-<section style="margin:12px 0 20px 0;padding:18px 16px;border:1px solid #d6d6d6;border-radius:6px;background:#f2f2f2;">
-  <section style="text-align:center;margin:-30px 0 12px 0;">
-    <section style="display:inline-block;background:#0f4c81;color:#ffffff;font-weight:700;font-size:15px;letter-spacing:2px;padding:8px 20px;border-radius:6px;">
-      报告摘要
-    </section>
+<section style="box-sizing:border-box;width:100%;max-width:100%;margin:12px 0 20px 0;padding:0 16px 18px 16px;border:1px solid #d6d6d6;border-radius:6px;background:#f2f2f2;overflow:hidden;">
+  <section style="text-align:center;margin:0 0 12px 0;line-height:0;">
+    <section style="display:inline-block;vertical-align:top;border-right:0.4em solid rgb(87,161,218);border-bottom:0.4em solid rgb(87,161,218);box-sizing:border-box;line-height:0;max-width:5%;border-top:0.4em solid transparent !important;border-left:0.4em solid transparent !important;"><br /></section>
+    <section style="padding:2px 5px;display:inline-block;vertical-align:top;border-radius:0 0 5px 5px;background-color:rgb(5,68,119);font-size:17px;line-height:1.6;color:rgb(255,255,255);box-sizing:border-box;max-width:90%;"><p style="margin:0;box-sizing:border-box;"><strong style="font-size:16px;">&nbsp;&nbsp;报 告 摘 要 &nbsp;</strong></p></section>
+    <section style="display:inline-block;vertical-align:top;border-bottom:0.4em solid rgb(87,161,218);border-left:0.4em solid rgb(87,161,218);box-sizing:border-box;line-height:0;max-width:5%;border-right:0.4em solid transparent !important;border-top:0.4em solid transparent !important;"><br /></section>
   </section>
 
   <p style="margin:10px 0 4px 0;line-height:1.75;font-size:15px;">
@@ -147,12 +147,9 @@
 </section>
 
 
-<section style="font-size:15px;line-height:1.8;"></section>
-<section style="font-size:15px;line-height:1.8;font-weight:700;">风险提示：市场环境变动风险，模型失效风险；本报告统计结果基于客观数据，不构成投资建议；基金过往业绩及基金经理管理其他产品的历史业绩不代表未来表现。</section>
-
 <section style="font-size:15px;line-height:1.8;font-weight:700;">注：本文选自国信证券于202x年x月xx日发布的研究报告《xxxx》</section>
 <section style="font-size:15px;line-height:1.8;font-weight:700;">分析师：张欣慰&nbsp;&nbsp;S0980520060001</section>
+<section style="font-size:15px;line-height:1.8;font-weight:700;">风险提示：市场环境变动风险，模型失效风险。</section>
 
 
 ---
-

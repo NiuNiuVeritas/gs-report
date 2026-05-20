@@ -190,6 +190,17 @@ def extract_core_summary_rows(document: Document) -> list[tuple[str, bool]]:
     return rows
 
 
+def extract_summary_risk(document: Document) -> str:
+    paragraphs = list(iter_table_paragraph_nodes(document))
+    start = next((index for index, item in enumerate(paragraphs) if item[0] == "核心观点"), None)
+    if start is None:
+        return ""
+    for text, _, _ in paragraphs[start + 1 :]:
+        if text.startswith("风险提示："):
+            return text
+    return ""
+
+
 def summary_block(markdown: str) -> str:
     start = markdown.find("报告摘要")
     if start == -1:
@@ -198,6 +209,20 @@ def summary_block(markdown: str) -> str:
     if end == -1:
         return markdown[start:]
     return markdown[start:end]
+
+
+def normalize_risk_notice(rows: list[str]) -> str:
+    cleaned_rows = [clean_text(row) for row in rows if clean_text(row)]
+    if not cleaned_rows:
+        return ""
+    first = cleaned_rows[0]
+    if first.startswith("风险提示："):
+        return " ".join([first, *cleaned_rows[1:]])
+    return "风险提示：" + " ".join(cleaned_rows)
+
+
+def is_risk_appendix_boundary(text: str) -> bool:
+    return text.startswith(("附：", "附:"))
 
 
 def parse_args() -> argparse.Namespace:
@@ -223,6 +248,8 @@ def main() -> None:
     summary_rows = extract_core_summary_rows(document)
     summary_text_rows = [row for row in summary_rows if not row[0].startswith("风险提示：")]
     missing_summary: list[str] = [row for row, _ in summary_text_rows if normalized(row) not in summary_text]
+    summary_risk_notice = extract_summary_risk(document)
+    body_risk_rows: list[str] = []
     expected_summary_bullets = sum(1 for _, is_bullet in summary_rows if is_bullet)
     actual_summary_bullets = len(re.findall(r'<li\s+data-gs-summary-bullet="true"', summary_raw))
     missing_markers: list[str] = []
@@ -231,6 +258,7 @@ def main() -> None:
     figure_count = 0
     table_count = 0
     expected_body_bullets = 0
+    collecting_risk = False
     previous_body_heading_like = False
 
     for block in iter_blocks(document):
@@ -239,8 +267,25 @@ def main() -> None:
             if not source:
                 continue
             style = block.style.name
+            title = clean_heading_title(source)
+            if collecting_risk:
+                if style == "Normal" and source == "免责声明":
+                    break
+                if style in {
+                    "国信研报正文-1.正文一级标题",
+                    "国信研报正文-2.正文二级标题",
+                } or is_risk_appendix_boundary(source):
+                    collecting_risk = False
+                else:
+                    if style in {"国信研报正文-4.正文", "Normal"}:
+                        body_risk_rows.append(source)
+                    continue
             if style == "国信研报正文-1.正文一级标题":
                 started = True
+                if title == "风险提示":
+                    collecting_risk = True
+                    previous_body_heading_like = False
+                    continue
                 previous_body_heading_like = False
             if started and style == "Normal" and source == "免责声明":
                 break
@@ -251,7 +296,7 @@ def main() -> None:
                 "Normal",
             }:
                 checked_paragraphs += 1
-                expected_source = clean_heading_title(source) if style in {
+                expected_source = title if style in {
                     "国信研报正文-1.正文一级标题",
                     "国信研报正文-2.正文二级标题",
                 } else source
@@ -274,6 +319,8 @@ def main() -> None:
                     previous_body_heading_like = False
         elif started:
             previous_body_heading_like = False
+            if collecting_risk:
+                continue
             title = table_title(block)
             if table_has_image(block):
                 root = etree.fromstring(block._element.xml.encode("utf-8"))
@@ -296,9 +343,11 @@ def main() -> None:
     img_refs = re.findall(r'<img src="([^"]+)"', markdown)
     missing_images = [ref for ref in img_refs if not (args.markdown.parent / ref).exists()]
     actual_body_bullets = len(re.findall(r'<li\s+data-gs-body-bullet="true"', markdown))
+    expected_risk_notice = summary_risk_notice or normalize_risk_notice(body_risk_rows)
     footer_checks = {
         "source_note": "注：本文选自国信证券于" in markdown,
         "analyst": "分析师：" in markdown and re.search(r"S\d{13}", markdown) is not None,
+        "risk": not expected_risk_notice or normalized(expected_risk_notice) in text,
         "law": "law.png" in markdown,
     }
 
