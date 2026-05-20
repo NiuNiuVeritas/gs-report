@@ -46,7 +46,7 @@ python scripts/verify_gs_report.py --docx <report.docx> --markdown <generated.md
 - Treat `核心观点` as the extraction-area label, not a summary point title. If no standalone summary headings exist, split paragraphs by short leading bold labels into numbered summary points.
 - Use Chinese numerals `一、二、三` for summary points.
 - Use default body line-height `1.6` with paragraph before/after spacing `0`.
-- Render the `报告摘要` badge with the established blue center label and two light-blue corner triangles matching the current design reference; keep it inside the summary frame so it is not clipped when no title precedes the summary.
+- Render the `报告摘要` badge with the established blue center label and two light-blue corner triangles matching the current design reference. The badge straddles the summary frame's top border: emit the badge as the first child of the frame with a negative top margin (currently `-15px`) so the dark-blue label crosses the line and the light-blue corner triangles extend above the frame. Do not put `font-size:0` on the badge wrapper — the triangles use `0.4em` borders, and a zero font-size collapses them to nothing. Remove `overflow:hidden` from the frame so the protruding portion is not clipped, and give the frame enough top margin to accommodate the overflow.
 - Keep summary blocks WeChat-editor safe: all summary containers use `box-sizing:border-box;width:100%;max-width:100%`, and summary bullets are rendered as native `<li>` bullets with controlled inline width styles.
 - Set the `总结` section's top margin to `0`.
 

@@ -473,11 +473,11 @@ def extract_summary(document: Document) -> list[tuple[str, list[tuple[str, bool,
 
 def render_summary(groups: list[tuple[str, list[tuple[str, bool, str]]]]) -> str:
     parts = [
-        '<section style="box-sizing:border-box;width:100%;max-width:100%;margin:12px 0 22px 0;padding:0 16px 18px 16px;border:1px solid #d6d6d6;border-radius:6px;background:#f7f7f7;overflow:hidden;">',
-        '<section style="text-align:center;margin:0 0 12px 0;line-height:0;">'
-        '<section style="display:inline-block;vertical-align:top;border-right:0.4em solid rgb(87,161,218);border-bottom:0.4em solid rgb(87,161,218);box-sizing:border-box;line-height:0;max-width:5%;border-top:0.4em solid transparent !important;border-left:0.4em solid transparent !important;"><br /></section>'
+        '<section style="box-sizing:border-box;width:100%;max-width:100%;margin:48px 0 22px 0;padding:0 16px 18px 16px;border:1px solid #d6d6d6;border-radius:6px;background:#f7f7f7;">',
+        '<section style="margin:-12px 0 12px 0;text-align:center;font-size:0;line-height:0;box-sizing:border-box;">'
+        '<section style="display:inline-block;vertical-align:top;font-size:16px;border-right:0.4em solid rgb(87,161,218);border-bottom:0.4em solid rgb(87,161,218);box-sizing:border-box;line-height:0;border-top:0.4em solid transparent !important;border-left:0.4em solid transparent !important;"><br /></section>'
         '<section style="padding:2px 5px;display:inline-block;vertical-align:top;border-radius:0 0 5px 5px;background-color:rgb(5,68,119);font-size:17px;line-height:1.6;color:rgb(255,255,255);box-sizing:border-box;max-width:90%;"><p style="margin:0;box-sizing:border-box;"><strong style="font-size:16px;">&nbsp;&nbsp;报 告 摘 要 &nbsp;</strong></p></section>'
-        '<section style="display:inline-block;vertical-align:top;border-bottom:0.4em solid rgb(87,161,218);border-left:0.4em solid rgb(87,161,218);box-sizing:border-box;line-height:0;max-width:5%;border-right:0.4em solid transparent !important;border-top:0.4em solid transparent !important;"><br /></section>'
+        '<section style="display:inline-block;vertical-align:top;font-size:16px;border-bottom:0.4em solid rgb(87,161,218);border-left:0.4em solid rgb(87,161,218);box-sizing:border-box;line-height:0;border-right:0.4em solid transparent !important;border-top:0.4em solid transparent !important;"><br /></section>'
         '</section>',
     ]
     for index, (heading, items) in enumerate(groups, 1):
